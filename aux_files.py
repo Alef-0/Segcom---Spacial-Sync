@@ -28,18 +28,21 @@ class Files:
             & (~np.isin(points[:, 10],[1,2,3, 5,6,7,13,14])) # Cluster state
         ]
 
-    def get(self, num, normalized = False):
+    def get(self, num):
         num = num % self.total
         files = self.dicio[self.keys[num]]
         pcd = PointCloud.from_path(files['radar']['FILE'])
         points = self.filter_pcd(pcd.numpy())
         points = points[:, [2, 1]].copy()
-        # Normalize if necessary
-        if normalized: 
-            points[:,0] = (2 * ((points[:,0] + X_LIMIT) / (2 * X_LIMIT))) - 1 # [-1,1]
-            points[:,1] = (points[:,1]) / Y_LIMIT # [0, 1]
+
         # Return the image and a copy of the points
         return cv.imread(files['camera']['FILE']), points
+    
+    def normalize(self, points):
+        points[:,0] = (2 * ((points[:,0] + X_LIMIT) / (2 * X_LIMIT))) - 1 # [-1,1]
+        points[:,1] = (points[:,1]) / Y_LIMIT # [0, 1]
+        return points
+
     
 a = Files()
 # print(a.get(150, True)[1])
