@@ -9,7 +9,7 @@ if __name__ == "__main__":
     graph = Graph()
 
     # Ficar mostrando
-    i = 0
+    i = 100
     p_pressed = False
     leave = True
     while leave:
@@ -19,8 +19,8 @@ if __name__ == "__main__":
         
         # Exhibit it
         new_img = cv.resize(img, (1280, 720))
-        graph.show_points(points[:, 0], points[:, 1], len(points) * [(255,0,0)])
-        # cv.imshow("CAMERA", new_img)
+        graph.show_points(points[:, 0], points[:, 1], len(points) * [(0,200,0)])
+        cv.imshow("CAMERA", new_img)
         
         while (True):
             key = chr(cv.waitKey(1) & 0xFF)    
