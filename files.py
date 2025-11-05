@@ -1,0 +1,45 @@
+import json
+import numpy as np
+import cv2 as cv
+from pypcd4 import PointCloud
+import torch
+from torch import tensor
+
+Y_LIMIT = 12
+X_LIMIT = 6
+
+class GetFiles:
+    def __init__(self, path = "valores/group_B.json"):
+        self.dicio : dict = json.load(open(path, "r"))
+        self.keys = list(self.dicio.keys())
+        first, last = int(self.keys[0]), int(self.keys[-1])
+        self.total = last - first + 1
+        self.divider = round(self.total * 0.85)
+    
+    def filter_pcd(self, points : np.ndarray): # Hard Coded for the usual values
+        return points[
+            (points[:, 1] < Y_LIMIT) # Menor que 12 mestros
+            & (abs(points[:,2]) < X_LIMIT) # Sem estar nas bordas
+            & (~np.isin(points[:, 7], [3,4]))  # Sem candidates
+            
+            & (points[:, 6] > -20) # RCS
+            & (points[:, 8] <= 4) & (points[:,8] != 0) # PDH
+            & (np.isin(points[:, 9],[3,4])) # Ambiguidade
+            & (~np.isin(points[:, 10],[1,2,3, 5,6,7,13,14])) # Cluster state
+        ]
+
+    def get(self, num, normalized = False):
+        num = num % self.total
+        files = self.dicio[self.keys[num]]
+        pcd = PointCloud.from_path(files['radar']['FILE'])
+        points = self.filter_pcd(pcd.numpy())
+        points = points[:, [2, 1]].copy()
+        # Normalize if necessary
+        if normalized: 
+            points[:,0] = (2 * ((points[:,0] + X_LIMIT) / (2 * X_LIMIT))) - 1 # [-1,1]
+            points[:,1] = (points[:,1]) / Y_LIMIT # [0, 1]
+        # Return the image and a copy of the points
+        return cv.imread(files['camera']['FILE']), points
+    
+a = GetFiles()
+print(a.get(150, True)[1])
