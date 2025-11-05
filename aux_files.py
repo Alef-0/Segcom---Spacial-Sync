@@ -8,7 +8,7 @@ from torch import tensor
 Y_LIMIT = 12
 X_LIMIT = 6
 
-class GetFiles:
+class Files:
     def __init__(self, path = "valores/group_B.json"):
         self.dicio : dict = json.load(open(path, "r"))
         self.keys = list(self.dicio.keys())
@@ -41,5 +41,5 @@ class GetFiles:
         # Return the image and a copy of the points
         return cv.imread(files['camera']['FILE']), points
     
-a = GetFiles()
-print(a.get(150, True)[1])
+a = Files()
+# print(a.get(150, True)[1])

@@ -22,7 +22,7 @@ def generate_code_colors():
         transformed.append((b,g,r))
     return transformed
 
-class Graph_radar():
+class Graph():
     def __init__(self):
         # Define graph parameters
         self.margin = 50
@@ -115,11 +115,11 @@ class Graph_radar():
         cv.line(new_img, center, end_left, (0,0,0), 1)
         cv.line(new_img, center, end_right, (0,0,0), 1)
 
+        # Draw the semicircules
         for i in range(1, self.y_max + 1):
             x,y = self.graph_to_pixel(i,i)
             cv.ellipse(new_img, center, (x - center[0], center[1] - y), 0, 225, 315, (0,0,0), 1)
 
-        # Draw
         return new_img
 
     def show_points(self, x_group, y_group, color_codes):
