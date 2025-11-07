@@ -4,6 +4,9 @@ from aux_graph import Graph
 import cv2 as cv
 import math
 import numpy as np
+import numpy.typing as npt
+from typing import Union
+from math import hypot as dst
 
 MATRIX = np.array([
 	   [1.31030209e+03, 0.00000000e+00, 8.87851418e+02],
@@ -11,36 +14,47 @@ MATRIX = np.array([
        [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]]
 	   , dtype=np.float64)
 DISTORTION = np.array([[-0.45288733,  0.27704813,  0.01715661,  0.00394433, -0.09480632]])
-wid_and_hei = (1920, 1080)
-SLOPE = math.tan(math.radians(30))
 
-CORRECTION_Y = 0.5
-CORRECTION_X = 0.1
+WID_HEI = (1920, 1080)
+GOOD_POINTS = [160, 212, 593, 1005, 1371]
 
-def transform_to_image(img):
+def correct_image(img):
     # Find the new optimal camera matrix for the full view (alpha=1)
-    new_camera_matrix, _ = cv.getOptimalNewCameraMatrix(MATRIX, DISTORTION, wid_and_hei, 0, wid_and_hei)
+    new_camera_matrix, _ = cv.getOptimalNewCameraMatrix(MATRIX, DISTORTION, WID_HEI, 0, WID_HEI)
     return cv.undistort(img, MATRIX, DISTORTION, None, new_camera_matrix)
 
-def simple_points_transformation(x : np.ndarray, y : np.ndarray):
-    # Delimitar Y
-    y_normalized = y / 12  # Normalizar e ao mesmo tempo ter um offset minimo
-    y_normalized = y_normalized + (CORRECTION_Y * (1 - y_normalized))
-    y_image_points = 1080 - (y_normalized * 540) # Pegar do de baixo
+def determine_position(x, y, first : npt.NDArray, last : npt.NDArray):
+        # Checando Os pontos
+        center_r = 2 * ((first[2] + first[0]) / 2) / 1720 - 1
+        center_b = 2 * ((last[2] + last[0]) / 2) / 1720 - 1
+        height_r = (1080 - first[3]) / 540 
+        height_b = (1080 - last[3]) / 540 
 
-    # Delimitar X
-    x_image_points = [] # Needs to be based around the distance avaiable
-    for dist, radius in zip(x,y):
-        max_x = radius / SLOPE
-        x_normalized = dist / max_x
-        # x_normalized = x_normalized + CORRECTION_X * (1 - x_normalized) * (1 if x_normalized > 0 else -1)
-        x_image_points.append(960 + x_normalized * 960)
-    
-    return np.column_stack([x_image_points, y_image_points])
+        # Proporção para o eixo y valer mais
+        dist_r = dst((center_r - x) * 3, (height_r - y) * 5)
+        dist_b = dst((center_b - x) * 3, (height_b - y) * 5)
 
-def put_radar_in_image(points, img):
-    for x, y in points:
-        cv.circle(img, (int(x),int(y)), 10, (0,200, 0), -1)
+        # if abs(x) > 1: 
+        #     print(f"[{center_r :.3}, {height_r :.3}] and [{center_b:.3}, {height_b:.3}], para distancia {dist_r:.3} vs {dist_b:.3}, com [{x:.3}, {y:.3}]")
+        # checando as distancias
+
+        if dist_r < dist_b: return True
+        else: return False
+
+
+def determine_side(first : npt.NDArray, last : Union[npt.NDArray, None], points : npt.NDArray):
+    points[:,0] = (2 * ((points[:,0] + 5) / 10)) - 1 # [-1,1]
+    points[:,1] = (points[:,1]) / 10 # [0, 1]
+
+    # Fazer a lógica
+    colors = []
+    for p in points:
+        if last is None: 
+            colors.append((0,0,255))
+        else:  
+            value = determine_position(p[0], p[1], first, last)
+            colors.append((0,0,255) if value else (255,0,0))
+    return colors
 
 if __name__ == "__main__":
     files = Files()
@@ -48,30 +62,36 @@ if __name__ == "__main__":
     graph = Graph()
 
     # Ficar mostrando
-    i = 100
-    p_pressed = False
-    leave = True
-    while leave:
-        img, points = files.get(i); i+=1        
-        radar_to_image_points = (simple_points_transformation(points[:,0], points[:,1]))
+    i = 0 # 1200 -> Direto pro radar
 
-        # Correct Camera
-        new_img = img.copy()
-        new_img = transform_to_image(new_img)
-        # Exhibit points in it
-        delimiters = vision.get_squares(new_img)
-        left, right = vision.determine_left_right(delimiters, new_img) # Image Bounding Box
-        graph.show_points(points[:, 0], points[:, 1], len(points) * [(0,200,0)]) # Radar Graph Points
-        put_radar_in_image(radar_to_image_points, new_img) # Put radar points in images
-        # Resize and show image
-        cv.putText(new_img, f"{i}", (0,50), cv.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 3)
-        new_img = cv.resize(new_img, (1280, 720)) 
-        cv.imshow("CAMERA", new_img)
+
+
+    while True:
+        image, points = files.get(GOOD_POINTS[i])
+        if image is not None: 
+            new_img = image.copy()
+            new_img = correct_image(new_img)
+            delimiters = vision.get_squares(new_img)
+            left, right = vision.determine_left_right(delimiters, new_img)
+
+            # Checar se é válido
+            if not points.any(): i+=1; continue
+            if (right is not None and
+                not (left[2] < right[0] or  right[2] < left[0] or # não interseciona no X
+                    left[3] < right[1] or right[3] < left[1])): # Não interseciona no y
+                    i+=1; continue
+
+            
+            new_image = cv.resize(new_img, (1280, 720))
+            cv.putText(new_image, f"{GOOD_POINTS[i]}", (0,50), cv.FONT_HERSHEY_SIMPLEX, 2, (255,255,255), 3)
+            cv.imshow("CAMERA", new_image)
         
-        while (True):
-            key = chr(cv.waitKey(1) & 0xFF)    
-            match key:
-                case 'p': p_pressed = not p_pressed
-                case 'q': leave = False; break
-                case _: 
-                    if not p_pressed: break
+        colors = determine_side(left, right, points.copy())
+        graph.show_points(points[:, 0], points[:, 1], colors) # Radar Graph Points
+        key = cv.waitKey(0) & 0xFF
+        match key:
+            case 81: i -= 1 # Esquerda
+            case 83: i += 1 # Direita
+            case 27: break  # Apertar ESC para sair
+            case _: print(key)
+        

@@ -5,15 +5,15 @@ from pypcd4 import PointCloud
 import torch
 from torch import tensor
 
-Y_LIMIT = 12
+Y_LIMIT = 10
 X_LIMIT = 6
 
 class Files:
     def __init__(self, path = "valores/group_B.json"):
         self.dicio : dict = json.load(open(path, "r"))
         self.keys = list(self.dicio.keys())
-        first, last = int(self.keys[0]), int(self.keys[-1])
-        self.total = last - first + 1
+        self.first, self.last = int(self.keys[0]), int(self.keys[-1])
+        self.total = self.last - self.first + 1
         self.divider = round(self.total * 0.85)
     
     def filter_pcd(self, points : np.ndarray): # Hard Coded for the usual values
@@ -29,14 +29,16 @@ class Files:
         ]
 
     def get(self, num):
-        num = num % self.total
+        num = (num + self.first) % self.total
         files = self.dicio[self.keys[num]]
         pcd = PointCloud.from_path(files['radar']['FILE'])
         points = self.filter_pcd(pcd.numpy())
         points = points[:, [2, 1]].copy()
 
+        image = cv.imread(file) if (file := files['camera']['FILE']) != "NONE" else None
+
         # Return the image and a copy of the points
-        return cv.imread(files['camera']['FILE']), points
+        return image, points
     
     def normalize(self, points):
         points[:,0] = (2 * ((points[:,0] + X_LIMIT) / (2 * X_LIMIT))) - 1 # [-1,1]
