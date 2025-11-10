@@ -12,14 +12,15 @@ class Transformation():
 
         self.k1, self.k2, self.p1, self.p2, self.k3 = self.d
 
-        self.camera_matrix, self.roi = cv.getOptimalNewCameraMatrix(self.k, self.d, (1920, 1080), 1, (1920, 1080))
+        self.opt_matrix, self.roi = cv.getOptimalNewCameraMatrix(self.k, self.d, (1920, 1080), 1, (1920, 1080))
 
-    def undistort_image(self, img : cv.Mat): return cv.undistort(img, self.k, self.d, None, self.camera_matrix)
+    def undistort_image(self, img : cv.Mat): return cv.undistort(img, self.k, self.d, None, self.opt_matrix)
 
     def normalize_coordinates(self, points : np.ndarray):
+        # It needs to normalize into what it mapped
         points_normalized = np.zeros((points.shape[0], 2))
-        points_normalized[:,0] = (points[:,0] - self.cx) / self.fx
-        points_normalized[:,1] = (points[:,1] - self.cy) / self.fy
+        points_normalized[:,0] = (points[:,0] - self.opt_matrix[0,2]) / self.opt_matrix[0,0]
+        points_normalized[:,1] = (points[:,1] - self.opt_matrix[1,2]) / self.opt_matrix[1,1]
         return points_normalized
 
     def distort_points(self, points : np.ndarray):
