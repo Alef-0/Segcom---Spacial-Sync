@@ -32,15 +32,19 @@ class Transformation():
         
         # Tangential distortion
         points_distorted = np.zeros_like(points)
-        points_distorted[:, 0] = points[:, 0] * radial + 2 * self.p1 *points[:, 0]*points[:, 1] + self.p2 * (r2 + 2*points[:, 0]**2)
-        points_distorted[:, 1] = points[:, 1] * radial + self.p1 *(r2 + 2*points[:, 1]**2) + 2 * self.p2 * points[:, 0] * points[:, 1]
+        points_distorted[:, 0] = points[:, 0]  * radial + 2 * self.p1 *points[:, 0]*points[:, 1] + self.p2 * (r2 + 2*points[:, 0]**2)
+        points_distorted[:, 1] = points[:, 1]  * radial + self.p1 *(r2 + 2*points[:, 1]**2) + 2 * self.p2 * points[:, 0] * points[:, 1]
 
         # Convert back to pixel coordinates
         distorted_pixels = np.zeros_like(points_distorted)
         distorted_pixels[:, 0] = points_distorted[:, 0] * self.fx + self.cx
         distorted_pixels[:, 1] = points_distorted[:, 1] * self.fy + self.cy
+        
+        simple_points = np.zeros_like(points)
+        simple_points[:,0] = points[:,0] * self.fx + self.cx
+        simple_points[:,1] = points[:,1] * self.fy + self.cy
 
-        return distorted_pixels
+        return distorted_pixels, simple_points
 
     def radar_to_distorted(self, points : np.ndarray):
         # Apply Homogeneous matrix transformation [Same thing as cv.perspective transform]
@@ -50,9 +54,9 @@ class Transformation():
         
         # Convert to normalized camera coordinates
         points_normalized = self.normalize_coordinates(undistorted_pixels) # K-1
-        distorted_pixels = self.distort_points(points_normalized) # K and D
+        distorted_complex, distorted_simple = self.distort_points(points_normalized) # K and D
         
-        return undistorted_pixels, distorted_pixels
+        return undistorted_pixels, distorted_complex, distorted_simple
 
 import time
 from aux_files import Files
@@ -84,23 +88,27 @@ if __name__ == '__main__':
         distorted = image.copy()
         undistorted = mapping.undistort_image(image)
 
-        und_points, dist_points = mapping.radar_to_distorted(points)
-        for x, y in und_points:
-            cv.circle(undistorted, (int(x), int(y)), 12, (0,0,255), -1)
-        for x, y in dist_points:
-            # print(x,y)
+        und_points, dist_complex, dist_simple = mapping.radar_to_distorted(points)
+        for x, y in dist_complex:
             if 0 < x < 1920 and 0 < y < 1080:
                 cv.circle(distorted, (int(x), int(y)), 12, (255,0,0), -1)
+        for x, y in dist_simple:
+            if 0 < x < 1920 and 0 < y < 1080:
+                cv.circle(distorted, (int(x), int(y)), 12, (0,255,0), -1)
+        for x, y in und_points:
+            cv.circle(undistorted, (int(x), int(y)), 12, (0,0,255), -1)
+                
+
 
         
         cv.imshow("CROPPED", cv.resize(undistorted, (1280, 720)))
         cv.imshow("ORIGINAL", cv.resize(distorted, (1280, 720)))
-        key = cv.waitKey(30) & 0xFF
+        key = cv.waitKey(16) & 0xFF
         
         match key:
             case 113: break # Q
             case 112: 
                     while True: # P
-                        key = cv.waitKey(30) & 0xFF
+                        key = cv.waitKey(16) & 0xFF
                         match key:
                             case 112: break # Q

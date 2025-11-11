@@ -2,8 +2,6 @@ import json
 import numpy as np
 import cv2 as cv
 from pypcd4 import PointCloud
-import torch
-from torch import tensor
 
 Y_LIMIT = 10
 X_LIMIT = 6

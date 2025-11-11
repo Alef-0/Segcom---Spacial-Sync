@@ -28,12 +28,9 @@ class Checkerboard_Checker():
     def calibrate_camera(self, w, h):
         ret, mtx, dist, rvecs, tvecs = cv.calibrateCamera(self.objpoints, self.imgpoints, (w, h), None, None)
         new_camera_matrix, roi = cv.getOptimalNewCameraMatrix(mtx, dist, (w, h), 1, (w, h))
-        self.intrinsic_matrix = new_camera_matrix
-        self.distortion_matrix = dist
-
-        print("ISSO É A ORIGINAL", mtx)
-        print("E ESSA A OUTRA", new_camera_matrix)
-        
+        self.intrinsic_matrix = mtx
+        self.distortion_matrix = dist        
+        self.transformation_matrix = new_camera_matrix
 
 def main():
     cam = cv.VideoCapture(0)
