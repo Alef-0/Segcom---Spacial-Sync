@@ -23,6 +23,15 @@ def generate_code_colors():
         transformed.append((b,g,r))
     return transformed
 
+LAST_PRESSED = np.array([[500,500]])
+
+def mouse_callback_graph(event, x, y, flags, param):
+    global LAST_PRESSED
+    if event == cv.EVENT_LBUTTONDOWN:
+        print(x,y)
+        LAST_PRESSED = np.vstack((LAST_PRESSED, [x,y]))
+        print(LAST_PRESSED)
+
 class Graph():
     def __init__(self):
         # Define graph parameters
@@ -41,6 +50,12 @@ class Graph():
         pixel_x = int(self.origin_x + (x * self.graph_width) / (self.x_max - self.x_min))
         pixel_y = int(self.origin_y - (y * self.graph_height) / (self.y_max - self.y_min))
         return (pixel_x, pixel_y)
+    
+    def pixel_to_graph(self, pixel_x, pixel_y):
+        x = (pixel_x - self.origin_x) * (self.x_max - self.x_min) / self.graph_width
+        y = (self.origin_y - pixel_y) * (self.y_max - self.y_min) / self.graph_height
+        return x, y
+
     
     def create_base_image(self):
         frame = np.ones((HEIGHT, WIDTH, 3), dtype=np.uint8) * 255
@@ -126,13 +141,26 @@ class Graph():
 
         return new_img
 
-    def show_points(self, x_group, y_group, color_codes):
+    def show_points(self, x_group, y_group, color_codes, point_callback = False):
         new_img = self.base_image.copy()
         for x, y, c in zip(x_group, y_group, color_codes):
             value = self.graph_to_pixel(x,y)
             cv.circle(new_img, value, 4, c, -1)
         cv.imshow("RADAR", new_img)
+        if point_callback: cv.setMouseCallback("RADAR", mouse_callback_graph, new_img)
 
     def close(self):
         cv.destroyAllWindows()
         cv.waitKey(1)
+
+if __name__ == "__main__":
+    graph = Graph()
+    points = [[1,2], [3,4], [-3,4]]
+
+    while True:
+        current_points = points + [graph.pixel_to_graph(x,y) for x,y in LAST_PRESSED]
+        current_points = np.array(current_points)
+        # print(current_points)
+        graph.show_points(current_points[:,0], current_points[:,1], [(255,0,0)] * len(current_points))
+        cv.waitKey(1)
+    

@@ -6,6 +6,7 @@ import math
 import time
 from aux_files import Files
 from aux_graph import Graph
+from aux_vision import Vision
 
 # Correção a ser aplicada para os valores
 CORRECTION_Y = 0.4
@@ -24,19 +25,19 @@ class Transformation():
             self.cx, self.cy = self.k[0,2], self.k[1,2]
             self.k1, self.k2, self.p1, self.p2, self.k3 = self.d
 
-            print(self.k, self.d, self.opt_matrix)
+            # print(self.k, self.d, self.opt_matrix)
 
         else:
             self.k = intrinsic
             self.d = distortion
             self.h = homography
+            self.opt_matrix, _ = cv.getOptimalNewCameraMatrix(self.k, self.d, (1920, 1080), 1, (1920, 1080))
 
             self.fx, self.fy = self.k[0,0], self.k[1,1]
             self.cx, self.cy = self.k[0,2], self.k[1,2]
             self.k1, self.k2, self.p1, self.p2, self.k3 = self.d
-            self.opt_matrix, _ = cv.getOptimalNewCameraMatrix(self.k, self.d, (1920, 1080), 1, (1920, 1080))
 
-            print(self.opt_matrix)
+            # print(self.opt_matrix)
 
     def undistort_image(self, img : cv.Mat): return cv.undistort(img, self.k, self.d, None, self.opt_matrix)
 
@@ -82,82 +83,113 @@ class Transformation():
         
         return undistorted_pixels, distorted_complex, distorted_simple
     
-    def generate_homography(self, files : Files):
+    def visualize_result(self, files : Files):
         for num in range(files.first, files.last):
             image, points = files.get(num)
             if image is None or not points.any(): continue
 
             # Undistort image
             distorted = image.copy()
-            undistorted = mapping.undistort_image(image)
+            undistorted = self.undistort_image(image)
                 
             cv.imshow("CROPPED", cv.resize(undistorted, (1280, 720)))
             cv.imshow("ORIGINAL", cv.resize(distorted, (1280, 720)))
             key = cv.waitKey(16) & 0xFF
 
-    def radar_to_undistorted(self, x : np.ndarray, y : np.ndarray):
-        # Delimitar Y
-        y_normalized = np.minimum(y / 10, 1)  # Normalizar e ao mesmo tempo ter um offset minimo
-        y_image_points = 1080 - ((CORRECTION_Y + (1 - CORRECTION_Y) * y_normalized) * 540) # Pegar do de baixo
 
-        # Delimitar X
-        x_image_points = [] # Needs to be based around the distance avaiable
-        for dist, radius in zip(x,y):
-            max_x = radius / SLOPE
-            x_normalized = dist / max_x
-            print(max_x, x_normalized)
-            result = 960 + x_normalized * 960
-            x_image_points.append(result)
-            # print(x_normalized, result)
+def part1_look_for_good_takes(mapping : Transformation, files : Files, vision : Vision, graph : Graph):
+    all_goods = [922, 1005, 1100, 1440, 1588, 1650, 1695, 1840, 1935, 2052] # These were the good ones
+    num = files.first + 100
+    paused = False
+    end = True
+
+    while end:
+        if num < files.first or num > files.last: break
+        image, points = files.get(num)
+        if image is None or not points.any(): 
+            num += 1; continue
+
+        cv.putText(image, f"{num}", (0,75), cv.FONT_HERSHEY_SIMPLEX, 3, (255,255,255), 3)
+        # Exibir a imagem original
+        distorted = image.copy()
+        cv.imshow("ORIGINAL", cv.resize(distorted, (1280, 720)))
+        # Exibir a distorcida
+        # undistorted = mapping.undistort_image(image)
+        # cv.imshow("CROPPED", cv.resize(undistorted, (1280, 720)))
+        # Exibir os pontos
+        graph.show_points(points[:, 0], points[:, 1], len(points) * [(0,150,0)])
+
+        first = True
+        while paused or first:
+            key = (cv.waitKey(0) & 0xFF) if paused else (cv.waitKey(30) & 0xFF) 
+            first = False
+            match key:
+                case 113: end = False; break # Q
+                case 112: paused = not paused; # P (Pausar)
+                case 81:  num -= 1; break # Esquerda
+                case 83:  num += 1; break # direita
+                case 255: num += 1  
+                case 97: all_goods.append(num); print(all_goods)
+            # if key != 255: print(key)
+     
+    print(all_goods)
+    return all_goods
         
-        return np.column_stack([x_image_points, y_image_points])
-
 
 
 if __name__ == '__main__':
-    MATRIX = np.array([[6221.92422097575, 0.0, 907.0708040584582], [0.0, 7620.661949881767, 120.96692648284439], [0.0, 0.0, 1.0]], dtype=np.float64)
-    DISTORTION = np.array([-8.201663966549852, 93.00752542264131, 0.22430706498995545, 0.03268512101141362, -607.527225839154], dtype=np.float64)
-    HOMOGRAPH = np.array([
-                            [     42.819,      152.72,      1015.6],
-                            [    -185.61,     59.863,      747.48],
-                            [    -0.3605,      0.1478,           1]
-                            ])
-
     files = Files()
+    vision = Vision()
     graph = Graph()
-    # mapping = Transformation(None, MATRIX, DISTORTION, HOMOGRAPH)
     mapping = Transformation("second_attempt.json")
-    # mapping.generate_homography(files)
 
-    for num in range(files.first, files.last):
-        image, points = files.get(num)
-        if image is None or not points.any(): continue
-        graph.show_points(points[:, 0], points[:, 1], len(points) * [(0,200,0)])
+    # Visualizar o video normalmente
+    all_goods = [922, 1005, 1100, 1440, 1588, 1650, 1695, 1840, 1935, 2052] # part1_look_for_good_takes(mapping, files, vision, graph)
+    
 
-        distorted = image.copy()
-        undistorted = mapping.undistort_image(image)
-        points_undistorted = mapping.radar_to_undistorted(points[:,0], points[:,1])
-        print(points_undistorted)
+    # MATRIX = np.array([[6221.92422097575, 0.0, 907.0708040584582], [0.0, 7620.661949881767, 120.96692648284439], [0.0, 0.0, 1.0]], dtype=np.float64)
+    # DISTORTION = np.array([-8.201663966549852, 93.00752542264131, 0.22430706498995545, 0.03268512101141362, -607.527225839154], dtype=np.float64)
+    # HOMOGRAPH = np.array([
+    #                         [     42.819,      152.72,      1015.6],
+    #                         [    -185.61,     59.863,      747.48],
+    #                         [    -0.3605,      0.1478,           1]
+    #                         ])
 
-        # und_points, dist_complex, dist_simple = mapping.radar_to_distorted(points)
-        # for x, y in dist_complex:
-        #     if 0 < x < 1920 and 0 < y < 1080:
-        #         cv.circle(distorted, (int(x), int(y)), 12, (255,0,0), -1)
-        # for x, y in dist_simple:
-        #     if 0 < x < 1920 and 0 < y < 1080:
-        #         cv.circle(distorted, (int(x), int(y)), 12, (0,255,0), -1)
-        for x, y in points_undistorted:
-            cv.circle(undistorted, (int(x), int(y)), 12, (0,0,255), -1)
+    # files = Files()
+    # graph = Graph()
+    # # mapping = Transformation(None, MATRIX, DISTORTION, HOMOGRAPH)
+    # mapping = Transformation("second_attempt.json")
+    # # mapping.generate_homography(files)
+
+    # for num in range(files.first, files.last):
+    #     image, points = files.get(num)
+    #     if image is None or not points.any(): continue
+    #     graph.show_points(points[:, 0], points[:, 1], len(points) * [(0,200,0)])
+
+    #     distorted = image.copy()
+    #     undistorted = mapping.undistort_image(image)
+    #     points_undistorted = mapping.radar_to_undistorted(points[:,0], points[:,1])
+    #     print(points_undistorted)
+
+    #     # und_points, dist_complex, dist_simple = mapping.radar_to_distorted(points)
+    #     # for x, y in dist_complex:
+    #     #     if 0 < x < 1920 and 0 < y < 1080:
+    #     #         cv.circle(distorted, (int(x), int(y)), 12, (255,0,0), -1)
+    #     # for x, y in dist_simple:
+    #     #     if 0 < x < 1920 and 0 < y < 1080:
+    #     #         cv.circle(distorted, (int(x), int(y)), 12, (0,255,0), -1)
+    #     # for x, y in points_undistorted:
+    #     #     cv.circle(undistorted, (int(x), int(y)), 12, (0,0,255), -1)
                 
-        cv.imshow("CROPPED", cv.resize(undistorted, (1280, 720)))
-        cv.imshow("ORIGINAL", cv.resize(distorted, (1280, 720)))
-        key = cv.waitKey(40) & 0xFF
+    #     cv.imshow("CROPPED", cv.resize(undistorted, (1280, 720)))
+    #     cv.imshow("ORIGINAL", cv.resize(distorted, (1280, 720)))
+    #     key = cv.waitKey(40) & 0xFF
         
-        match key:
-            case 113: break # Q
-            case 112: 
-                    while True: # P
-                        key = cv.waitKey(16) & 0xFF
-                        match key:
-                            case 112: break # Q
-            case _: print(key)
+    #     match key:
+    #         case 113: break # Q
+    #         case 112: 
+    #                 while True: # P
+    #                     key = cv.waitKey(16) & 0xFF
+    #                     match key:
+    #                         case 112: break # Q
+    #         case _: print(key)

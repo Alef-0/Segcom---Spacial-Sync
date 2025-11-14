@@ -9,8 +9,8 @@ X_LIMIT = 6
 class Files:
     def __init__(self, path = "valores/group_B.json"):
         self.dicio : dict = json.load(open(path, "r"))
-        self.keys = list(self.dicio.keys())
-        self.first, self.last = int(self.keys[0]), int(self.keys[-1])
+        self.keys = sorted([int(x) for x in self.dicio.keys()])
+        self.first, self.last = self.keys[0], self.keys[-1]
         self.total = self.last - self.first + 1
         self.divider = round(self.total * 0.85)
     
@@ -27,8 +27,10 @@ class Files:
         ]
 
     def get(self, num):
-        num = (num + self.first) % self.total
-        files = self.dicio[self.keys[num]]
+        if num < self.first or num > self.last: return None, None
+
+        # num = (num + self.first) % self.total
+        files = self.dicio[str(num)]
         pcd = PointCloud.from_path(files['radar']['FILE'])
         points = self.filter_pcd(pcd.numpy())
         points = points[:, [2, 1]].copy()
@@ -44,5 +46,5 @@ class Files:
         return points
 
     
-a = Files()
+# a = Files()
 # print(a.get(150, True)[1])
