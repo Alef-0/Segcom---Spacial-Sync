@@ -25,13 +25,6 @@ def generate_code_colors():
 
 LAST_PRESSED = np.array([[500,500]])
 
-def mouse_callback_graph(event, x, y, flags, param):
-    global LAST_PRESSED
-    if event == cv.EVENT_LBUTTONDOWN:
-        print(x,y)
-        LAST_PRESSED = np.vstack((LAST_PRESSED, [x,y]))
-        print(LAST_PRESSED)
-
 class Graph():
     def __init__(self):
         # Define graph parameters
@@ -141,13 +134,16 @@ class Graph():
 
         return new_img
 
-    def show_points(self, x_group, y_group, color_codes, point_callback = False):
+    def show_points(self, x_group, y_group, color_codes, point_callback = None):
         new_img = self.base_image.copy()
         for x, y, c in zip(x_group, y_group, color_codes):
             value = self.graph_to_pixel(x,y)
             cv.circle(new_img, value, 4, c, -1)
+        # cv.namedWindow("RADAR", cv.WINDOW_GUI_NORMAL)
         cv.imshow("RADAR", new_img)
-        if point_callback: cv.setMouseCallback("RADAR", mouse_callback_graph, new_img)
+        if point_callback: cv.setMouseCallback("RADAR", point_callback)
+
+        return new_img
 
     def close(self):
         cv.destroyAllWindows()

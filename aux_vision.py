@@ -28,5 +28,15 @@ class Vision:
             cv.rectangle(img, last[0:2], last[2:], (255,0,0), 3)
         
         return first, last
+    
+    def draw_get_limitations(self, image, delimiter : np.ndarray, color, division):
+        if delimiter is None: return None
+        middle_y = int((delimiter[1] + delimiter[3]) / 2)
+        middle_x = int((delimiter[0] + delimiter[2]) / 2)
+
+        cv.line(image, (delimiter[0], middle_y), (delimiter[2], middle_y), color, 2)
+        cv.line(image, (middle_x, delimiter[1]), (middle_x, delimiter[3]), color, 2)
+        return middle_x, middle_y
+        
 
     

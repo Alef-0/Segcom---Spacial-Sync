@@ -8,6 +8,8 @@ from aux_files import Files
 from aux_graph import Graph
 from aux_vision import Vision
 
+from math import dist
+
 # Correção a ser aplicada para os valores
 CORRECTION_Y = 0.4
 CORRECTION_X = 0.1
@@ -96,7 +98,6 @@ class Transformation():
             cv.imshow("ORIGINAL", cv.resize(distorted, (1280, 720)))
             key = cv.waitKey(16) & 0xFF
 
-
 def part1_look_for_good_takes(mapping : Transformation, files : Files, vision : Vision, graph : Graph):
     all_goods = [922, 1005, 1100, 1440, 1588, 1650, 1695, 1840, 1935, 2052] # These were the good ones
     num = files.first + 100
@@ -128,13 +129,109 @@ def part1_look_for_good_takes(mapping : Transformation, files : Files, vision : 
                 case 112: paused = not paused; # P (Pausar)
                 case 81:  num -= 1; break # Esquerda
                 case 83:  num += 1; break # direita
-                case 255: num += 1  
-                case 97: all_goods.append(num); print(all_goods)
+                case 255: num += 1  # Prosseguir
+                case 97: all_goods.append(num); print(all_goods) # Botao A
             # if key != 255: print(key)
      
     print(all_goods)
     return all_goods
         
+def part2_define_positions(mapping : Transformation, files : Files, vision : Vision, graph : Graph, scenes : list[int]):
+    hc = Homography_Creator()
+    end = True
+    num = 0
+
+    while True:
+        if num == len(scenes): break
+        image, points = files.get(scenes[num])
+
+        # Definir limitantes da imagem
+        delimiters = vision.get_squares(image)
+        left, right = vision.determine_left_right(delimiters, image)
+        left_image_points = vision.draw_get_limitations(image, left, (0,0,255), 0.35)
+        right_image_points = vision.draw_get_limitations(image, right, (255,0,0), 0.35)
+
+        # Exibir a distorcida
+        undistorted = mapping.undistort_image(image)
+        cv.imshow("CROPPED", cv.resize(undistorted, (1280, 720)))
+        
+        # Exibir os pontos
+        new_points, colors = hc.define_colors(points)
+        radar_image = graph.show_points(new_points[:, 0], new_points[:, 1], colors, hc.mouse_callback)
+        hc.draw_line(radar_image); cv.imshow("RADAR", radar_image) # NEEDAGAIN
+
+        key = (cv.waitKey(0) & 0xFF)
+        match key:
+            case 113: break # Q
+            case 81:  continue # Esquerda
+            case 83:  continue # direita
+            case 255: pass
+            case 122: hc.l_position = hc.cur_position # Z esquerda
+            case 120: hc.r_position = hc.cur_position # X Direita
+            case 101: hc.add_points(left_image_points, right_image_points); num += 1 # E
+        if key != 255: print(key)
+    
+    # Gerar a matriz homografica
+
+class Homography_Creator():
+    def __init__(self):
+        self.radar_points = []
+        self.image_pixels = []
+        self.cur_position = (0,0)
+
+        self.l_position = []
+        self.r_position = []
+        self.graph = Graph()
+
+        self.average_l : np.ndarray = np.nan
+        self.average_r : np.ndarray = np.nan
+
+    def mouse_callback(self, event, x, y, flags, param):
+        self.cur_position = self.graph.pixel_to_graph(x,y)        
+        # print(self.l_position, self.r_position)
+    
+    def define_colors(self, points : np.ndarray):
+        new_points = [(x,y) for x, y in points.tolist()]
+        # Define colors
+        if self.l_position and self.r_position:
+            colors = []; l_group, r_group = [],[]
+            for p in new_points:
+                dist_l = dist(p, self.l_position); dist_r = dist(p, self.r_position)
+                colors.append((0,0,255) if dist_l < dist_r else (255,0,0))
+                l_group.append(p) if dist_l < dist_r else r_group.append(p)
+                
+                # Pegar a media
+                self.average_l = np.mean(np.array(l_group), axis=0) if l_group else np.nan
+                self.average_r = np.mean(np.array(r_group), axis=0) if r_group else np.nan
+        else: colors = [(0,150, 0)] * len(new_points)
+        # Put points
+        if self.l_position: new_points.append(self.l_position); colors.append((0,0,255))
+        if self.r_position: new_points.append(self.r_position); colors.append((255,0,0))
+
+        return np.array(new_points, dtype=np.float64), colors
+    
+    def draw_line(self, image):
+        # print(self.average_l, self.average_r)
+        if self.average_l is not np.nan and self.average_r is not np.nan:
+            l = self.graph.graph_to_pixel
+            cv.line(image, l(*self.average_l), l(*self.l_position), (0,0,255), 2)
+            cv.line(image, l(*self.average_r), l(*self.r_position), (255,0,0), 2)
+    
+    def add_points(self, limagep, rimagep):
+        # Pegar os pixels
+        self.radar_points.append(self.average_l.tolist()); self.image_pixels.append(limagep)
+        self.radar_points.append(self.average_r.tolist()); self.image_pixels.append(rimagep)
+        
+        # Reset everything
+        self.average_l = np.nan
+        self.average_r = np.nan
+        self.l_position = []
+        self.r_position = []
+
+        print(self.radar_points)
+        print(self.image_pixels)
+        print("---------")
+
 
 
 if __name__ == '__main__':
@@ -145,7 +242,8 @@ if __name__ == '__main__':
 
     # Visualizar o video normalmente
     all_goods = [922, 1005, 1100, 1440, 1588, 1650, 1695, 1840, 1935, 2052] # part1_look_for_good_takes(mapping, files, vision, graph)
-    
+    part2_define_positions(mapping, files, vision, graph, all_goods)
+
 
     # MATRIX = np.array([[6221.92422097575, 0.0, 907.0708040584582], [0.0, 7620.661949881767, 120.96692648284439], [0.0, 0.0, 1.0]], dtype=np.float64)
     # DISTORTION = np.array([-8.201663966549852, 93.00752542264131, 0.22430706498995545, 0.03268512101141362, -607.527225839154], dtype=np.float64)
