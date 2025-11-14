@@ -41,6 +41,8 @@ class Transformation():
 
             # print(self.opt_matrix)
 
+    def define_homography(self, H): self.h = H
+
     def undistort_image(self, img : cv.Mat): return cv.undistort(img, self.k, self.d, None, self.opt_matrix)
 
     def normalize_coordinates(self, points : np.ndarray):
@@ -85,18 +87,43 @@ class Transformation():
         
         return undistorted_pixels, distorted_complex, distorted_simple
     
-    def visualize_result(self, files : Files):
-        for num in range(files.first, files.last):
+    def visualize_result(self, files : Files, graph : Graph):
+        paused = False
+        end = False
+        for num in range(files.first + 100, files.last):
             image, points = files.get(num)
             if image is None or not points.any(): continue
 
-            # Undistort image
+            # Basic values
             distorted = image.copy()
             undistorted = self.undistort_image(image)
-                
+            graph.show_points(points[:,0], points[:,1], [(0,150,0)] * len(points))
+
+            # Colocar pontos no undistorted
+            distorted_p, _, undistorted_p = self.radar_to_distorted(points)
+            for x, y in undistorted_p:
+                cv.circle(undistorted, (int(x), int(y)), 12, (0,200,0), -1)
+
+
             cv.imshow("CROPPED", cv.resize(undistorted, (1280, 720)))
             cv.imshow("ORIGINAL", cv.resize(distorted, (1280, 720)))
-            key = cv.waitKey(16) & 0xFF
+            
+            # Estrutura de controle
+            first = True
+            while paused or first:
+                key = (cv.waitKey(0) & 0xFF) if paused else (cv.waitKey(30) & 0xFF) 
+                first = False
+                match key:
+                    case 113: end = True; break # Q
+                    case 112: paused = not paused; # P (Pausar)
+                    # case 81:  num -= 1; break # Esquerda
+                    # case 83:  num += 1; break # direita
+                    # case 255: num += 1  # Prosseguir
+                    # case 97: all_goods.append(num); print(all_goods) # Botao A
+            if end: break
+
+
+
 
 def part1_look_for_good_takes(mapping : Transformation, files : Files, vision : Vision, graph : Graph):
     all_goods = [922, 1005, 1100, 1440, 1588, 1650, 1695, 1840, 1935, 2052] # These were the good ones
@@ -172,6 +199,7 @@ def part2_define_positions(mapping : Transformation, files : Files, vision : Vis
         if key != 255: print(key)
     
     # Gerar a matriz homografica
+    return hc.find_homography()
 
 class Homography_Creator():
     def __init__(self):
@@ -228,11 +256,19 @@ class Homography_Creator():
         self.l_position = []
         self.r_position = []
 
-        print(self.radar_points)
-        print(self.image_pixels)
-        print("---------")
+        # print(self.radar_points)
+        # print(self.image_pixels)
+        # print("---------")
+    
+    def find_homography(self):
+        src_points = np.array(self.radar_points, dtype=np.float64)
+        dst_points = np.array(self.image_pixels, dtype=np.float64)
 
+        print(src_points)
+        print(dst_points)
 
+        H, status = cv.findHomography(src_points, dst_points, cv.RANSAC, 5.0)
+        return H
 
 if __name__ == '__main__':
     files = Files()
@@ -242,7 +278,14 @@ if __name__ == '__main__':
 
     # Visualizar o video normalmente
     all_goods = [922, 1005, 1100, 1440, 1588, 1650, 1695, 1840, 1935, 2052] # part1_look_for_good_takes(mapping, files, vision, graph)
-    part2_define_positions(mapping, files, vision, graph, all_goods)
+    # part2_define_positions(mapping, files, vision, graph, all_goods)
+    homography =     np.array([ [     395.36,   315.52, 893.36],
+                                [    -27.046,   176.36, 892.94],
+                                [  -0.074101,  0.35213,      1]], dtype=np.float64)
+    mapping.define_homography(homography)
+    mapping.visualize_result(files, graph)
+
+
 
 
     # MATRIX = np.array([[6221.92422097575, 0.0, 907.0708040584582], [0.0, 7620.661949881767, 120.96692648284439], [0.0, 0.0, 1.0]], dtype=np.float64)
