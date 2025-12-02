@@ -1,12 +1,14 @@
 import FreeSimpleGUI as sg
 import re
+from tkinter import Widget
 
 def prnt_num(num):
     return f"{num:06.01f}"
 
 class values_slider:
     def __init__(self):
-        sg.theme("SystemDefaultForReal")
+        # sg.theme("SystemDefaultForReal")
+        print(sg.theme_button_color())
 
         self.intrinsic = [[1,0,0], [0,1,0], [0,0,1]]
         self.extrinsic = [[1,0,0], [0,1,0], [0,0,1]]
@@ -65,9 +67,10 @@ class values_slider:
                         self.update_all_buttons()
                 # Selecionar o botão e trocar a cor
                 case s if re.match(r"^choose_", s):
-                    if self.selected: print(self.window[self.selected].__dict__)
+                    if self.selected: self.window[self.selected].update(button_color = sg.theme_button_color())
                     self.selected = event
                     self.window["SLIDER_VALUE"].update(self.value_from_matrix(event))
+                    self.window[event].update(button_color = ("#FFFFFF", "#5B925B"))
                 # Trocar o valor do botão
                 case s if re.match(r"^btn_", s): # Pressionar de um botão
                     new_value = min(max(-1000,values["SLIDER_VALUE"] + float(self.window[event].ButtonText)),1000)
