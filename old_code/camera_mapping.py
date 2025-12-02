@@ -106,7 +106,7 @@ class Transformation():
 
 
             cv.imshow("CROPPED", cv.resize(undistorted, (1280, 720)))
-            cv.imshow("ORIGINAL", cv.resize(distorted, (1280, 720)))
+            # cv.imshow("ORIGINAL", cv.resize(distorted, (1280, 720)))
             
             # Estrutura de controle
             first = True
@@ -264,10 +264,10 @@ class Homography_Creator():
         src_points = np.array(self.radar_points, dtype=np.float64)
         dst_points = np.array(self.image_pixels, dtype=np.float64)
 
-        print(src_points)
-        print(dst_points)
+        # print(src_points)
+        # print(dst_points)
 
-        H, status = cv.findHomography(src_points, dst_points, cv.RANSAC, 5.0)
+        H, status = cv.findHomography(src_points, dst_points, cv.RANSAC, 1.0)
         return H
 
 if __name__ == '__main__':
@@ -277,8 +277,9 @@ if __name__ == '__main__':
     mapping = Transformation("second_attempt.json")
 
     # Visualizar o video normalmente
-    all_goods = [922, 1005, 1100, 1440, 1588, 1650, 1695, 1840, 1935, 2052] # part1_look_for_good_takes(mapping, files, vision, graph)
-    # part2_define_positions(mapping, files, vision, graph, all_goods)
+    all_goods = [922, 1005, 1100, 1440, 1588, 1650, 1695, 1840, 1935, 2052]  
+    # part1_look_for_good_takes(mapping, files, vision, graph)
+    # homography =  part2_define_positions(mapping, files, vision, graph, all_goods)
     homography =     np.array([ [     395.36,   315.52, 893.36],
                                 [    -27.046,   176.36, 892.94],
                                 [  -0.074101,  0.35213,      1]], dtype=np.float64)
