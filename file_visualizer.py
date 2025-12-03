@@ -30,14 +30,13 @@ def visualize_everything(menu : windows_control, stop : threading.Event):
     vision = Vision()
     graph = Graph()
     slope = create_60_slope_points()
-    dist = np.array([0,0,0,0,0], dtype=np.float64)
 
     # Código de visualização
-    for num in range(files.first + 100, files.last):
+    for num in range(files.first + 100, files.last - 1):
         image, points = files.get(num)
         if image is None or not points.any(): continue
 
-        image = try_to_undistort_image(image, menu.intrinsic, dist)
+        image = try_to_undistort_image(image, menu.intrinsic, menu.distortion)
         radar_to_image(menu.extrinsic, slope, image, (255,255,255)) # Drawing o the image
         radar_to_image(menu.extrinsic, points, image, (0,0,255))
 
@@ -52,5 +51,6 @@ if __name__ == "__main__":
     menu = windows_control()
     stop = threading.Event()
     th = threading.Thread(target=visualize_everything, args=(menu,stop), daemon=True); th.start()
+    menu.get_coefficients_from_json()
     menu.run_window()
     stop.set(); th.join()

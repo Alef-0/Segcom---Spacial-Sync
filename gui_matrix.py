@@ -1,12 +1,14 @@
 import FreeSimpleGUI as sg
 import numpy as np
 from tkinter import Widget
+import json
 
 def prnt_num(num):
-    return f"{num:+08.01f}"
+    return f"{num:+07.01f}"
 
 def newbtn(name, key, disabled = False, font =("Courier", 12)):
-    return sg.Button(name, key=key, font=font, disabled= disabled)
+    color = ("white", "black") if disabled else sg.theme_button_color()
+    return sg.Button(name, key=key, font=font, disabled= disabled, button_color=color)
      
 
 class windows_control:
@@ -19,13 +21,15 @@ class windows_control:
             [960,0,960], 
             [0,-540,1080], 
             [0,0,1]], dtype = np.float64)
+        self.distortion = np.array([[0,0,0,0,0]], dtype = np.float64)
+
         self.selected = None
         self.font = ("Courier", 10)
 
         self.layout = [
             [sg.Push(), self.create_slider_layout(), sg.Push()],
-            [self.create_intrinsic_matrix(), sg.Push(), self.create_extrinsic_matrix()],
-            [self.create_cases_selector(), sg.Push() , self.create_control_buttons()]
+            [self.create_intrinsic_matrix(), sg.Push(),self.create_distortion_layout() ,sg.Push(), self.create_extrinsic_matrix()],
+            [self.create_cases_selector(), sg.Push() , self.create_json_controls() ,sg.Push(), self.create_control_buttons()]
         ]
         self.window = sg.Window("SLIDER", self.layout, finalize=True)
         self.update_all_buttons()
@@ -37,6 +41,12 @@ class windows_control:
             for y in [0,1,2]:
                 self.window[f"choose_I{x}{y}"].update(prnt_num(self.intrinsic[x][y]))
                 self.window[f"choose_E{x}{y}"].update(prnt_num(self.extrinsic[x][y]))
+        for x in range(5): self.window[f"choose_D0{x}"].update(prnt_num(self.distortion[0][x]))
+
+    def create_json_controls(self):
+        return sg.Frame("Json Controls", [
+            [newbtn("SAVE", key="json_save"), newbtn("LOAD", key="json_load")]
+        ], title_location=sg.TITLE_LOCATION_TOP)
 
     def create_intrinsic_matrix(self):
         return sg.Frame("Intrinsic Matrix",[
@@ -54,13 +64,13 @@ class windows_control:
 
     def create_slider_layout(self):
         return sg.Frame("Value Adjust", [
-            [ #sg.Button("-10e4", key="btn_1"), 
-                sg.Push(), newbtn("-10e3", key="btn_2"), newbtn("-10e2", key="btn_3"),  newbtn("-10", key="btn_4"), 
-             newbtn("+10", key="btn_5"),newbtn("+10e2", key="btn_6"), newbtn("+10e3", key="btn_7"),  sg.Push()
-             #sg.Button("+10e4", key="btn_8")
+            [   sg.Push(),
+                newbtn("-10e3", key="btn_2"), newbtn("-10e2", key="btn_3"),  newbtn("-10", key="btn_4"), newbtn("-1", key="btn_1"), newbtn("-0.1", key="btn_10"),
+                newbtn("+0.1", key="btn_20"), newbtn("+1", key="btn_8"), newbtn("+10", key="btn_5"),newbtn("+10e2", key="btn_6"), newbtn("+10e3", key="btn_7"),
+                sg.Push()
              ],
-             [sg.Slider((-10e4 + 1, 10e4 - 1), (0), (0.01), orientation='h', expand_x=True, key="slider", 
-                        enable_events=True, disable_number_display=True, size=(75,20)), 
+             [sg.Slider((-1080, 1080), orientation='h', expand_x=True, key="slider", default_value=0,
+                        enable_events=True, disable_number_display=True, size=(75,20), resolution=30.0,), 
               sg.Input("0.0", key="input_text", size=(8,20), font = ('Helvetica', 12)), sg.Ok(key="input_ok")
               ]
         ], title_location=sg.TITLE_LOCATION_BOTTOM, key="SLIDER", expand_x=True)
@@ -78,10 +88,19 @@ class windows_control:
              newbtn(">>", key="con_next", font=('Helvetica', 12))]
         ], title_location= sg.TITLE_LOCATION_TOP)
 
+    def create_distortion_layout(self):
+        return sg.Frame("Distortion Coeficients",[
+            [newbtn("NONE", "choose_D00"),newbtn("NONE", "choose_D01")],[newbtn("NONE", "choose_D02"), newbtn("NONE", "choose_D03")], 
+            [sg.Push(), newbtn("NONE", "choose_D04"), sg.Push()]
+        ], title_location=sg.TITLE_LOCATION_TOP)
+
     def value_from_matrix(self, event, update = False, value = None):
         tipo, x, y = event[7:] # Do tipo choose_xxxx
         x = int(x); y = int(y)
-        sel = self.intrinsic if tipo == "I" else self.extrinsic
+        match tipo:
+            case "I": sel = self.intrinsic
+            case "E": sel = self.extrinsic
+            case "D": sel = self.distortion
         if update: sel[x,y] = value; self.update_all_buttons()
         return sel[x,y]
 
@@ -95,9 +114,13 @@ class windows_control:
             if event == sg.TIMEOUT_EVENT: pass
             elif event == sg.WINDOW_CLOSED: break
             elif event == "slider":       # Evento do slider
-                self.window['input_text'].update(values[event])
-                if self.selected: self.value_from_matrix(self.selected, True, values[event])
-                self.previous_num = values[event]
+                if values[event] == 0: 
+                    self.window["slider"].update(0.001)
+                    self.window['input_text'].update(0.001)
+                else:
+                    self.window['input_text'].update(values[event])
+                    if self.selected: self.value_from_matrix(self.selected, True, values[event])
+                    self.previous_num = values[event]
             elif event.startswith("choose_"):   # Selecionar o valor das matrizes
                 if self.selected: self.window[self.selected].update(disabled = False)
                 self.selected = event
@@ -124,11 +147,38 @@ class windows_control:
                     if self.selected: self.value_from_matrix(self.selected, True, value); 
                     self.previous_num = value
                 except: self.window["input_text"].update(self.previous_num)
+            elif event.startswith("json_"):
+                if event.endswith("load"): self.get_coefficients_from_json()
+                elif event.endswith("save"): self.save_coefficientes_in_json()
             else: print(event, values)
             # print(values)
 
 
         self.window.close()
+
+    def get_coefficients_from_json(self, file = "coefficients.json"):
+        with open(file, "r") as f:
+            a = json.load(f)
+            self.intrinsic = np.array(a["Intrinsic"], np.float64)
+            self.extrinsic = np.array(a["Extrinsic"], np.float64)
+            self.distortion = np.array(a["Distortion"], np.float64)
+        self.update_all_buttons()
+        if self.selected:
+            self.window["slider"].update(self.value_from_matrix(self.selected))
+            self.window["input_text"].update(self.value_from_matrix(self.selected))
+
+    def save_coefficientes_in_json(self, file = "new_coefficients.json"):
+        f =  open(file, "w")
+        f.write("{\n")
+        f.write("\t\"Intrinsic\": ")
+        f.write(f"{self.intrinsic.tolist()},\n")
+        f.write("\t\"Distortion\": ")
+        f.write(f"{self.distortion.tolist()},\n")
+        f.write("\t\"Extrinsic\": ")
+        f.write(f"{self.extrinsic.tolist()}\n")
+        f.write("}")
+        f.close()
+
 
 if __name__ == "__main__":
     slider = windows_control()

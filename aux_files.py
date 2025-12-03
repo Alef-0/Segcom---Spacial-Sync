@@ -38,7 +38,7 @@ class Files:
         image = cv.imread(file) if (file := files['camera']['FILE']) != "NONE" else None
 
         # Return the image and a copy of the points
-        return image, self.normalize(points)
+        return image, points
     
     def normalize(self, points):
         points[:,0] = (2 * ((points[:,0] + X_LIMIT) / (2 * X_LIMIT))) - 1 # [-1,1]
