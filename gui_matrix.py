@@ -1,5 +1,5 @@
 import FreeSimpleGUI as sg
-import re
+import numpy as np
 from tkinter import Widget
 
 def prnt_num(num):
@@ -8,18 +8,20 @@ def prnt_num(num):
 class values_slider:
     def __init__(self):
         # sg.theme("SystemDefaultForReal")
-        print(sg.theme_button_color())
+        
 
-        self.intrinsic = [[1,0,0], [0,1,0], [0,0,1]]
-        self.extrinsic = [[1,0,0], [0,1,0], [0,0,1]]
+        self.intrinsic = np.array([[1,0,0], [0,1,0], [0,0,1]], dtype = np.float64)
+        self.extrinsic = np.array([[1,0,0], [0,1,0], [0,0,1]], dtype = np.float64)
         self.selected = None
 
         self.layout = [
             [self.create_slider_layout()],
             [self.create_intrinsic_matrix(), sg.Push(), self.create_extrinsic_matrix()],
+            [self.create_cases_selector(), sg.Push() , self.create_control_buttons()]
         ]
         self.window = sg.Window("SLIDER", self.layout, finalize=True)
         self.update_all_buttons()
+        self.window.hide()
 
     def update_all_buttons(self):
         for x in [0,1,2]:
@@ -48,37 +50,53 @@ class values_slider:
              [sg.Slider((-1000, 1000), (0), (0.01), orientation='h', expand_x=True, key="SLIDER_VALUE", enable_events=True)]
         ], title_location=sg.TITLE_LOCATION_BOTTOM, key="SLIDER")
 
+    def create_cases_selector(self):
+        return sg.Frame("Instrinsic specifics", [
+            [sg.Button("Fx", key="sel_fx"), sg.Button("Fy", key="sel_fy"), sg.Button("Cx", key="sel_cx"), sg.Button("Cy", key="sel_cy")]
+        ], title_location= sg.TITLE_LOCATION_TOP)
+
+    def create_control_buttons(self):
+        return sg.Frame("Control Player", [
+            [sg.Button("<<", key="con_prev"), sg.Button("||", key="con_pause"), sg.Button(">", key="con_play"), sg.Button(">>", key="con_next")]
+        ], title_location= sg.TITLE_LOCATION_TOP)
+
+
     def value_from_matrix(self, event, update = False, value = None):
         tipo, x, y = event[7:] # Do tipo choose_xxxx
         x = int(x); y = int(y)
         sel = self.intrinsic if tipo == "I" else self.extrinsic
-        if update: sel[x][y] = value
-        else: return sel[x][y]
+        if update: sel[x,y] = value
+        return sel[x,y]
 
     def run_window(self):
+        self.window.UnHide()
         while True:
             event, values = self.window.read(1)
-            match event:
-                case sg.TIMEOUT_EVENT: pass
-                case sg.WINDOW_CLOSED: break
-                case "SLIDER_VALUE":
-                    if self.selected: 
-                        self.value_from_matrix(self.selected, True, values[event])
-                        self.update_all_buttons()
-                # Selecionar o botão e trocar a cor
-                case s if re.match(r"^choose_", s):
-                    if self.selected: self.window[self.selected].update(button_color = sg.theme_button_color())
-                    self.selected = event
-                    self.window["SLIDER_VALUE"].update(self.value_from_matrix(event))
-                    self.window[event].update(button_color = ("#FFFFFF", "#5B925B"))
-                # Trocar o valor do botão
-                case s if re.match(r"^btn_", s): # Pressionar de um botão
-                    new_value = min(max(-1000,values["SLIDER_VALUE"] + float(self.window[event].ButtonText)),1000)
-                    self.window["SLIDER_VALUE"].update(new_value)
-                    if self.selected: 
-                        self.value_from_matrix(self.selected, True, new_value)
-                        self.update_all_buttons()
-                case _: print(event, values)
+            
+            # Cases
+            if event == sg.TIMEOUT_EVENT: pass
+            elif event == sg.WINDOW_CLOSED: break
+            elif event == "SLIDER_VALUE":       # Evento do slider
+                if self.selected: 
+                    self.value_from_matrix(self.selected, True, values[event])
+                    self.update_all_buttons()
+            elif event.startswith("choose_"):   # Selecionar o valor das matrizes
+                if self.selected: self.window[self.selected].update(disabled = False)
+                self.selected = event
+                self.window["SLIDER_VALUE"].update(self.value_from_matrix(event))
+                self.window[event].update(disabled = True)
+            elif event.startswith("btn_"):      # Mudar o valor do slider por botão
+                new_value = min(max(-1000,values["SLIDER_VALUE"] + float(self.window[event].ButtonText)),1000)
+                self.window["SLIDER_VALUE"].update(new_value)
+                if self.selected: 
+                    self.value_from_matrix(self.selected, True, new_value)
+                    self.update_all_buttons()
+            elif event.startswith("sel_"):
+                if event.endswith("fx"): self.window["choose_I00"].click()
+                if event.endswith("fy"): self.window["choose_I11"].click()
+                if event.endswith("cx"): self.window["choose_I02"].click()
+                if event.endswith("cy"): self.window["choose_I12"].click()
+            else: print(event, values)
             # print(values)
 
 
