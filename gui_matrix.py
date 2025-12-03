@@ -3,7 +3,11 @@ import numpy as np
 from tkinter import Widget
 
 def prnt_num(num):
-    return f"{num:06.01f}"
+    return f"{num:+08.01f}"
+
+def newbtn(name, key, disabled = False, font =("Courier", 12)):
+    return sg.Button(name, key=key, font=font, disabled= disabled)
+     
 
 class windows_control:
     def __init__(self):
@@ -16,9 +20,10 @@ class windows_control:
             [0,-540,1080], 
             [0,0,1]], dtype = np.float64)
         self.selected = None
+        self.font = ("Courier", 10)
 
         self.layout = [
-            [self.create_slider_layout()],
+            [sg.Push(), self.create_slider_layout(), sg.Push()],
             [self.create_intrinsic_matrix(), sg.Push(), self.create_extrinsic_matrix()],
             [self.create_cases_selector(), sg.Push() , self.create_control_buttons()]
         ]
@@ -35,35 +40,42 @@ class windows_control:
 
     def create_intrinsic_matrix(self):
         return sg.Frame("Intrinsic Matrix",[
-            [sg.Button("NONE", key="choose_I00"),sg.Button("NONE", key="choose_I01"),sg.Button("NONE", key="choose_I02")],
-            [sg.Button("NONE", key="choose_I10"),sg.Button("NONE", key="choose_I11"),sg.Button("NONE", key="choose_I12")],
-            [sg.Button("NONE", key="choose_I20"),sg.Button("NONE", key="choose_I21"),sg.Button("NONE", key="choose_I22")]
+            [newbtn("NONE", "choose_I00"), newbtn("NONE", "choose_I01", disabled=True), newbtn("NONE", "choose_I02")],
+            [newbtn("NONE", "choose_I10", disabled=True), newbtn("NONE", "choose_I11"), newbtn("NONE", "choose_I12")],
+            [newbtn("NONE", "choose_I20", disabled=True), newbtn("NONE", "choose_I21", disabled=True), newbtn("NONE", "choose_I22")]
         ], title_location=sg.TITLE_LOCATION_TOP, key="INTRINSIC")
 
     def create_extrinsic_matrix(self):
         return sg.Frame("Extrinsic Matrix",[
-            [sg.Button("NONE", key="choose_E00"),sg.Button("NONE", key="choose_E01"),sg.Button("NONE", key="choose_E02")],
-            [sg.Button("NONE", key="choose_E10"),sg.Button("NONE", key="choose_E11"),sg.Button("NONE", key="choose_E12")],
-            [sg.Button("NONE", key="choose_E20"),sg.Button("NONE", key="choose_E21"),sg.Button("NONE", key="choose_E22")]
+            [newbtn("NONE", "choose_E00"),newbtn("NONE", "choose_E01"),newbtn("NONE", "choose_E02")],
+            [newbtn("NONE", "choose_E10"),newbtn("NONE", "choose_E11"),newbtn("NONE", "choose_E12")],
+            [newbtn("NONE", "choose_E20"),newbtn("NONE", "choose_E21"),newbtn("NONE", "choose_E22")]
         ], title_location=sg.TITLE_LOCATION_TOP, key="EXTRINSIC")
 
     def create_slider_layout(self):
         return sg.Frame("Value Adjust", [
-            [ sg.Button("-1", key="btn_10"), sg.Button("-0.1", key="btn_1"),  sg.Button("-0.01", key="btn_2"),   sg.Button("-0.001", key="btn_3"),  
-            sg.Button("+0.001", key="btn_4"), sg.Button("+0.01", key="btn_5"), sg.Button("+0.1", key="btn_6"), sg.Button("+1", key="btn_11")],
-             [sg.Slider((-1080, 1080), (0), (0.01), orientation='h', expand_x=True, key="slider", enable_events=True, disable_number_display=True), 
-              sg.Input("0.0", key="input_text", size=(6,20)), sg.Ok(key="input_ok")
+            [ #sg.Button("-10e4", key="btn_1"), 
+                sg.Push(), newbtn("-10e3", key="btn_2"), newbtn("-10e2", key="btn_3"),  newbtn("-10", key="btn_4"), 
+             newbtn("+10", key="btn_5"),newbtn("+10e2", key="btn_6"), newbtn("+10e3", key="btn_7"),  sg.Push()
+             #sg.Button("+10e4", key="btn_8")
+             ],
+             [sg.Slider((-10e4 + 1, 10e4 - 1), (0), (0.01), orientation='h', expand_x=True, key="slider", 
+                        enable_events=True, disable_number_display=True, size=(75,20)), 
+              sg.Input("0.0", key="input_text", size=(8,20), font = ('Helvetica', 12)), sg.Ok(key="input_ok")
               ]
-        ], title_location=sg.TITLE_LOCATION_BOTTOM, key="SLIDER")
+        ], title_location=sg.TITLE_LOCATION_BOTTOM, key="SLIDER", expand_x=True)
 
     def create_cases_selector(self):
         return sg.Frame("Instrinsic specifics", [
-            [sg.Button("Fx", key="sel_fx"), sg.Button("Fy", key="sel_fy"), sg.Button("Cx", key="sel_cx"), sg.Button("Cy", key="sel_cy")]
+            [newbtn("Fx", key="sel_fx"), newbtn("Fy", key="sel_fy"), newbtn("Cx", key="sel_cx"), newbtn("Cy", key="sel_cy")]
         ], title_location= sg.TITLE_LOCATION_TOP)
 
     def create_control_buttons(self):
         return sg.Frame("Control Player", [
-            [sg.Button("<<", key="con_prev"), sg.Button("||", key="con_pause"), sg.Button(">", key="con_play"), sg.Button(">>", key="con_next")]
+            [newbtn("<<", key="con_prev", font=('Helvetica', 12)), 
+             newbtn("||", key="con_pause", font=('Helvetica', 12)), 
+             newbtn(">", key="con_play", font=('Helvetica', 12)), 
+             newbtn(">>", key="con_next", font=('Helvetica', 12))]
         ], title_location= sg.TITLE_LOCATION_TOP)
 
     def value_from_matrix(self, event, update = False, value = None):

@@ -21,6 +21,10 @@ def radar_to_image(homography_matrix, points, image, color):
 
     for x, y in final_points: cv.circle(image, (int(x), int(y)), 3, color, 5, -1)
 
+def try_to_undistort_image(image, intrinsic, distortion):
+    opt_matrix, _ = cv.getOptimalNewCameraMatrix(intrinsic, distortion, (1920, 1080), 1, (1920, 1080))
+    return cv.undistort(image, intrinsic, distortion, None, opt_matrix)
+
 def visualize_everything(menu : windows_control, stop : threading.Event):
     files = Files()
     vision = Vision()
@@ -33,7 +37,7 @@ def visualize_everything(menu : windows_control, stop : threading.Event):
         image, points = files.get(num)
         if image is None or not points.any(): continue
 
-        image = cv.undistort(image, menu.intrinsic, dist)
+        image = try_to_undistort_image(image, menu.intrinsic, dist)
         radar_to_image(menu.extrinsic, slope, image, (255,255,255)) # Drawing o the image
         radar_to_image(menu.extrinsic, points, image, (0,0,255))
 
